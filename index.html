@@ -308,7 +308,16 @@ let C={cards:{},newDay:'',newCount:0,dir:'hz'};          // spaced repetition
 function load(k,def){const x=Store.get(k);return x?Object.assign(def,x):def}
 S=load('hz-placement',S); C=load('hz-srs',C);
 C.custom=C.custom||[]; C.read=C.read||{};
-for(const x of C.custom) WORDS.push(x);          // words added from texts
+// words added from texts sit after the built-in list; when new lessons grow that list,
+// move their card progress along with them
+const BASE_N=WORDS.length;
+if(C.custom.length&&C.base&&C.base!==BASE_N){
+  const d=BASE_N-C.base,nc={};
+  for(const [k,v] of Object.entries(C.cards)) nc[+k>=C.base?+k+d:k]=v;
+  C.cards=nc;
+}
+C.base=BASE_N;
+for(const x of C.custom) WORDS.push(x);
 const saveS=()=>Store.set('hz-placement',S);
 const saveC=()=>Store.set('hz-srs',C);
 
