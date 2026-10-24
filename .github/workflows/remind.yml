@@ -1,0 +1,20 @@
+name: Напоминание
+on:
+  schedule:
+    - cron: '0 18 * * *'   # каждый день в 21:00 по Москве
+  workflow_dispatch: {}
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Отправить напоминание в Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          TEXTS=("加油！ Пора повторить карточки 🀄" "今天学什么？ Несколько минут на китайский?" "你好！ Слова ждут повторения." "好久不见！ Загляни в тренажёр.")
+          MSG=${TEXTS[$((RANDOM % ${#TEXTS[@]}))]}
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"reply_markup\":{\"inline_keyboard\":[[{\"text\":\"Открыть тренажёр\",\"web_app\":{\"url\":\"${APP_URL}\"}}]]}}"
