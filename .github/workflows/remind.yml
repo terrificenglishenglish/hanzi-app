@@ -10,7 +10,7 @@ jobs:
       - name: Отправить напоминание в Telegram
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
+          CHAT_ID: "1097981036"
           APP_URL: https://terrificenglishenglish.github.io/hanzi-app/
         run: |
           TEXTS=("加油！ Пора повторить карточки 🀄" "今天学什么？ Несколько минут на китайский?" "你好！ Слова ждут повторения." "好久不见！ Загляни в тренажёр.")
