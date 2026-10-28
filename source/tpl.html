@@ -196,6 +196,12 @@ body.noscroll{overflow:hidden}
 .wtarget{position:absolute;inset:0}
 .winfo{display:flex;align-items:center;justify-content:center;gap:12px}
 .wmean{text-align:center;font-size:18px;font-weight:500;margin:0}
+.wchars button.done{border-color:color-mix(in srgb,var(--known) 50%,var(--line))}
+.ladder{display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.ld{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:15px;background:var(--surface);border:1.5px solid var(--line);opacity:.55}
+.ld.now{border-color:var(--accent);background:var(--accent-soft);opacity:1}
+.ld.ok{border-color:var(--known);background:color-mix(in srgb,var(--known) 14%,var(--surface));opacity:1}
+.ltitle{display:flex;flex-direction:column;gap:2px;text-align:center}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 
