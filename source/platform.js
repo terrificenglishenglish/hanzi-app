@@ -50,16 +50,3 @@ setTimeout(()=>Cloud.pull(['hz-placement','hz-srs','hz-reader'],res=>{
   if(newer)location.reload();
 }),300);
 
-// recorded audio: file name = FNV-1a hash of the text
-function fnv(s){let h=0x811c9dc5;for(const b of new TextEncoder().encode(s)){h^=b;h=Math.imul(h,0x01000193)>>>0}return h.toString(16).padStart(8,'0')}
-let curA=null;
-function playRecorded(text,onend){
-  if(typeof AUDIO==='undefined'||!AUDIO.has(fnv(text)))return false;
-  try{if(curA){curA.onended=null;curA.pause()}}catch(e){}
-  try{speechSynthesis.cancel()}catch(e){}
-  const a=new Audio('audio/'+fnv(text)+'.mp3');curA=a;
-  a.onended=()=>{if(curA===a)curA=null;onend&&onend()};
-  a.play().catch(()=>{curA=null;speakTTS(text,onend)});
-  return true;
-}
-

@@ -4,8 +4,7 @@
 
 - `index.html` — само приложение (карточки, уроки, тексты, игры, письмо, тест)
 - `data/words.js` — уроки и слова, `data/texts.js` — тексты, `data/chars.js` — значения иероглифов, `data/strokes.js` — черты
-- `audio/` — озвучка (mp3), `data/audio.js` — список готовых файлов
-- `tools/make_audio.py` — дозаписать озвучку для новых слов
+- `audio/a0..af.json` — озвучка (mp3 в base64, 1084 записи), список ключей в `index.html` (AK)
 - `.github/workflows/remind.yml` — ежедневное напоминание в Telegram
 
 Прогресс хранится в облаке Telegram (CloudStorage), поэтому одинаков на телефоне и компьютере.

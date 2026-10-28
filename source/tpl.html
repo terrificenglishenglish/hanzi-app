@@ -255,12 +255,12 @@ const saveC=()=>{try{localStorage.setItem('hz-srs',JSON.stringify(C))}catch(e){}
 let zhVoice=null;
 function pickVoice(){try{const v=speechSynthesis.getVoices();zhVoice=v.find(x=>/zh[-_]CN/i.test(x.lang))||v.find(x=>/^zh/i.test(x.lang))||null}catch(e){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=()=>pickVoice()}catch(e){}
-const canSpeak=()=>!!zhVoice;
+const canSpeak=()=>AK.size>0||!!zhVoice;
 let toastT=0;
 function toast(msg){let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}
   el.textContent=msg;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},6000)}
 let curU=null;   // keep a reference: some browsers drop an utterance that gets garbage-collected
-function speakRaw(text,onend){
+function ttsSpeak(text,onend){
   const ss=window.speechSynthesis;
   if(!ss||!window.SpeechSynthesisUtterance){toast('Этот браузер не умеет озвучивать текст. Открой ссылку в Chrome или Safari.');return}
   if(!zhVoice)pickVoice();
@@ -282,6 +282,7 @@ function speakRaw(text,onend){
   try{ss.cancel()}catch(e){}
   go();
 }
+/*AUDIO*/
 function say(t){speakRaw(clean(t))}
 
 /* ---------- spaced repetition ---------- */
@@ -483,7 +484,7 @@ function lessonView(n){
 
 /* ---------- TEXTS ---------- */
 let playing=null;
-function stopAll(){playing=null;try{const ss=speechSynthesis;if(ss.speaking||ss.pending)ss.cancel()}catch(e){}document.querySelectorAll('.sent-row.now').forEach(e=>e.classList.remove('now'));const b=$('#playall');if(b)b.innerHTML=`${ICON} Слушать весь текст`}
+function stopAll(){playing=null;playTok++;try{player.pause()}catch(e){}try{const ss=speechSynthesis;if(ss.speaking||ss.pending)ss.cancel()}catch(e){}document.querySelectorAll('.sent-row.now').forEach(e=>e.classList.remove('now'));const b=$('#playall');if(b)b.innerHTML=`${ICON} Слушать весь текст`}
 function textsHome(){
   cur='texts';showTabs(true);
   const rows=TEXTS.map((t,k)=>`<button class="lrow" data-t="${k}"><span class="lnum">${t.lesson}</span><span class="lname"><b><span class="zhs">${esc(t.zh)}</span></b><span class="small muted">${esc(t.ru)} · урок ${t.lesson}</span></span><span class="pill ${C.read[k]?'k':'todo'}">${C.read[k]?'прочитано':t.s.length+' предл.'}</span></button>`).join('');

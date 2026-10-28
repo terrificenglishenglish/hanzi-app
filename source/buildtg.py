@@ -23,11 +23,10 @@ s = rep(s, "const saveS=()=>{try{localStorage.setItem('hz-placement',JSON.string
 s = rep(s, "const saveC=()=>{try{localStorage.setItem('hz-srs',JSON.stringify(C))}catch(e){}};", "const saveC=()=>Store.set('hz-srs',C);")
 s = rep(s, "try{Object.assign(RS,JSON.parse(localStorage.getItem('hz-reader')||'{}'))}catch(e){}", "Object.assign(RS,Store.get('hz-reader')||{});")
 s = rep(s, "function saveRS(){try{localStorage.setItem('hz-reader',JSON.stringify(RS))}catch(e){}}", "function saveRS(){Store.set('hz-reader',RS)}")
-s = rep(s, "function speakRaw(text,onend){", "function speakRaw(text,onend){if(playRecorded(text,onend))return;speakTTS(text,onend)}\nfunction speakTTS(text,onend){")
-s = rep(s, "function stopAll(){playing=null;", "function stopAll(){playing=null;try{if(curA){curA.onended=null;curA.pause();curA=null}}catch(e){}")
 s = rep(s, '<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.2/dist/hanzi-writer.min.js"></script>\n<script>\n',
         '<script src="vendor/hanzi-writer.min.js"></script>\n<script src="data/words.js"></script>\n<script src="data/texts.js"></script>\n'
-        '<script src="data/chars.js"></script>\n<script src="data/strokes.js"></script>\n<script src="data/audio.js"></script>\n<script>\n')
+        '<script src="data/chars.js"></script>\n<script src="data/strokes.js"></script>\n<script>\n')
+s = rep(s, '/*AUDIO*/\n', open('audio_block.js').read())
 for k in ['DATA', 'TEXTS', 'CHARPY', 'CHARRU', 'STROKES']:
     s = rep(s, '/*' + k + '*/\n', '')
 s = rep(s, "/*GAMES*/", js_games)
@@ -54,7 +53,9 @@ open(OUT + '/data/chars.js', 'w').write(open('charpy.js').read() + open('charru.
 shutil.copy('strokes.js', OUT + '/data/strokes.js')
 shutil.copy('hw/package/dist/hanzi-writer.min.js', OUT + '/vendor/hanzi-writer.min.js')
 
-# audio manifest from whatever mp3 files exist
-have = sorted(f[:-4] for f in os.listdir(OUT + '/audio') if f.endswith('.mp3'))
-open(OUT + '/data/audio.js', 'w').write('const AUDIO=new Set(' + json.dumps(have) + ');\n')
-print('index.html', len(html) // 1024, 'KB; audio files:', len(have))
+# recorded audio: the same packed clips the claude.ai page uses (audio/a0..af.json)
+import glob
+for f in glob.glob('artaudio/audio/a*.json'): shutil.copy(f, OUT + '/audio/')
+for f in glob.glob(OUT + '/audio/*.mp3'): os.remove(f)
+if os.path.exists(OUT + '/data/audio.js'): os.remove(OUT + '/data/audio.js')
+print('index.html', len(html) // 1024, 'KB; audio packs:', len(glob.glob(OUT + '/audio/a*.json')))

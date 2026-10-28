@@ -230,7 +230,6 @@ body.noscroll{overflow:hidden}
 <script src="data/texts.js"></script>
 <script src="data/chars.js"></script>
 <script src="data/strokes.js"></script>
-<script src="data/audio.js"></script>
 <script>
 /* ---------- PLATFORM: Telegram, cloud sync, recorded audio ---------- */
 const tg=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.WebApp:null;
@@ -284,19 +283,6 @@ setTimeout(()=>Cloud.pull(['hz-placement','hz-srs','hz-reader'],res=>{
   if(newer)location.reload();
 }),300);
 
-// recorded audio: file name = FNV-1a hash of the text
-function fnv(s){let h=0x811c9dc5;for(const b of new TextEncoder().encode(s)){h^=b;h=Math.imul(h,0x01000193)>>>0}return h.toString(16).padStart(8,'0')}
-let curA=null;
-function playRecorded(text,onend){
-  if(typeof AUDIO==='undefined'||!AUDIO.has(fnv(text)))return false;
-  try{if(curA){curA.onended=null;curA.pause()}}catch(e){}
-  try{speechSynthesis.cancel()}catch(e){}
-  const a=new Audio('audio/'+fnv(text)+'.mp3');curA=a;
-  a.onended=()=>{if(curA===a)curA=null;onend&&onend()};
-  a.play().catch(()=>{curA=null;speakTTS(text,onend)});
-  return true;
-}
-
 const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
 const FAST_MS=6000, MAX_Q=12, EARLY_STOP=6, NEW_PER_DAY=10, LEARNED_DAYS=60;
 const DAY=864e5, MIN=6e4;
@@ -331,13 +317,12 @@ const saveC=()=>Store.set('hz-srs',C);
 let zhVoice=null;
 function pickVoice(){try{const v=speechSynthesis.getVoices();zhVoice=v.find(x=>/zh[-_]CN/i.test(x.lang))||v.find(x=>/^zh/i.test(x.lang))||null}catch(e){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=()=>pickVoice()}catch(e){}
-const canSpeak=()=>!!zhVoice;
+const canSpeak=()=>AK.size>0||!!zhVoice;
 let toastT=0;
 function toast(msg){let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}
   el.textContent=msg;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},6000)}
 let curU=null;   // keep a reference: some browsers drop an utterance that gets garbage-collected
-function speakRaw(text,onend){if(playRecorded(text,onend))return;speakTTS(text,onend)}
-function speakTTS(text,onend){
+function ttsSpeak(text,onend){
   const ss=window.speechSynthesis;
   if(!ss||!window.SpeechSynthesisUtterance){toast('Этот браузер не умеет озвучивать текст. Открой ссылку в Chrome или Safari.');return}
   if(!zhVoice)pickVoice();
@@ -359,6 +344,30 @@ function speakTTS(text,onend){
   try{ss.cancel()}catch(e){}
   go();
 }
+/* recorded audio: mp3 clips for every word and sentence, packed in audio/a0..af.json; the browser voice is only a fallback */
+const AK=new Set("001daa65 00482740 004b5ff9 00597840 006e6b0a 0093b740 00954a40 01e9cf50 024f9d7c 02615a66 02b9289c 02c285b5 032ff78c 0342db8c 035b0ff9 03b4f123 03b53b5c 04396b1f 043d3997 046fbd8b 047db38c 0509387a 053adca8 05469c1f 05615f1f 059ec41f 05b95a76 05c49bc0 05cd9b65 05f9ec54 0651a2b2 06651293 06966666 06ae418b 0817cbb1 08440644 0851a5d8 086163d8 08cf0275 08d2c944 0903b24c 09090250 0917292b 096e6e26 0998b10e 09c22eba 09e1a534 09fcd09c 0a4510fe 0a49c9fe 0a6b4ee1 0aa1f1fe 0ab6a556 0b183cf2 0b51aa91 0b9bd0dd 0ba06091 0ba38691 0be54ace 0c3b5424 0c4dc6f6 0c616a24 0c9ecf24 0d483bb7 0d4b6ef4 0d593119 0d9ed0b7 0e0e3b37 0e616d4a 0e80e94a 0e85a24a 0e9ed24a 0ea99d53 0edd0ef5 0f0be2ad 0f3a72ec 0f45e023 0f616edd 1033ebf5 106a43a3 1079cb49 10978b92 10a38e70 10b241f8 11324c38 1171bb6f 118e3b07 1190ac03 11b39c6c 12263e9a 12323f7c 1251b596 12599496 128f1a96 12afd734 12c942ae 134161bc 1349d829 137ae075 13a6b929 141b9b4f 144520bc 145fe3bc 14a44831 14a6babc 150f7289 15b8b5ab 163c5882 1697f0d4 16f55fa2 170e0cbf 172e8408 17922248 17f1202a 18374638 1839b381 186691eb 18a39b08 18f84499 1949e19b 1960403e 19617e9b 19828d9b 19b040d1 1a012702 1a0fc3b4 1a133a1a 1a2e6ab3 1a53552e 1a828f2e 1a9ee52e 1aa0782e 1aac0044 1ac67e3d 1b1f224a 1b21f254 1b2ff6c1 1bbd698c 1c581154 1cc40801 1cd2051d 1d007b61 1d0b9749 1d628c25 1d72894e 1dbc7901 1e29d60d 1e4bf179 1e9243f8 1ea152bf 1eae4eb3 1eb90c1b 1ec5ee23 1f49eb0d 1f5ff50d 1f6f43e3 1fc01c8b 2051c423 20b7ea9b 20d4d53b 20d97b0d 21430208 215231fb 215d0fc3 21618b33 21e25e6e 220d7637 221f2e53 2249efc6 2251cec6 22696cbc 22cab364 230fcaf6 23875659 23add644 24580ecc 249715ec 2498a8ec 249f8392 2523069b 25384a2a 259bd8f5 25ecaa4a 26302ea5 26fc1dc0 2798ada5 27f75518 2823a421 2835687b 28619638 2897c24e 293a1a8c 295a5304 297d00ad 299efccb 29acd860 29bf1080 2a1c756f 2a393619 2a76105e 2a9efe5e 2aa0915e 2addf664 2b2e954b 2b81cdf3 2bd52d9b 2c49ff84 2c521476 2ca34d0c 2caa4fc7 2cf3a461 2d45d1e0 2d4c0783 2d537317 2d6d68ff 2d9f0317 2da09617 2e0186b4 2e48e98a 2e4a02aa 2e5b53aa 2e9f04aa 2ee12e9a 2f2ea9d0 2f4a043d 2f61a13d 2f6e6542 2f9f063d 2faf37d1 307bf151 3082b1d0 30f65587 31049130 315184da 316023d5 3190de63 31940463 3197457e 31a0cd06 31a6e863 31c1918d 3243027f 3263b47a 3282b4f6 32972bf6 33890289 338e4bf0 348dbd1c 34d380b1 35537faf 355b5eaf 3597f35f 3628ed15 368a61b1 370ed06d 3808e948 3811b3ca 38f21b91 39041584 392dff3a 3974629d 3985e5fb 39c9b98b 39d3fb41 3a56ad8e 3aa6f68e 3b28626d 3b318e0b 3b5f83e6 3c392338 3c481640 3c4b06d3 3c54fbfb 3d488747 3d5e881d 3d87bbf5 3d8dcb47 3e59d9da 3e61b8da 3ee5ad7a 3f1519cf 3f214c23 3f32a361 3f61ba6d 3f9f1f6d 3fb8d7ef 3fbafb35 3fc3bd90 3ffda85b 4001c11b 40cd975e 41128957 4114a15e 41305926 415e9793 41c21133 41eacaaf 4236a6b9 4256d3c4 42d3511a 4322314c 4333824c 4396286c 43acf7d1 43b817a9 44082519 44164427 443f1ce0 44ca01f8 44e7304c 4504d44a 45089693 452c9fdf 456030df 45669b93 459ff9d2 45a70018 45bc2f12 45d3d3ca 46284589 463f2006 46913334 46b3b89f 46b74d22 46e28998 47d34bb0 4826bd4c 4826f22b 48b35236 48d248f3 4908887f 492958e0 4954dea0 4955322b 4972013b 49e340e5 4a501f20 4a5418f0 4a9751be 4aad770e 4b338ee4 4b484f7d 4b79c5ad 4c547b10 4c5536e4 4c746905 4c75c840 4d140f5c 4d1491b8 4d75e0b7 4e48a20a 4e58600a 4f60409d 4fb0c51c 4fb1178c 501dfb57 506380d2 50663ec5 50dac21c 50fa0644 512bd05c 5132b5ad 513ea870 514822d7 519e43d2 521e7c69 5241c4e9 52701163 52906b86 5318d87c 5330757c 53485c15 536046e9 537f7221 538176ac 54c0fccd 5548ad0f 55a58e0f 55e48da5 5633a035 56e2761f 573b80c8 57861535 57de17f2 5843615b 586c5727 591c07ee 5938a164 598bb82c 59a5945b 59d7a1f9 5a0aef06 5a1bb619 5af45b71 5b308214 5b47c444 5b8ad639 5c1bd38e 5c1f32a7 5c28f6db 5c3083a7 5c425500 5c459214 5c54e1fb 5c9adc65 5cd3ecb8 5d0b4114 5d0f93c7 5d626983 5d861ea7 5e2f533c 5e53c03a 5e60cb92 5e8c3b53 5e97713a 5fe5e2cb 5fef4bef 60076a7b 60427260 60509d60 60605b60 609a9a60 614312ee 61605cf3 61609e03 617739f5 61aaed5a 62798e86 62d8f6ba 63427719 634bcca5 638a8323 63a8c944 642f9dfc 645eceac 648d8757 64a0bd8e 64baf121 64e27392 651b02ed 651b1c6b 651f689b 6526da5a 6549b7ff 65555e3f 6599d300 65e0f290 665885d2 66a38bd1 66ca8f2f 67050db9 67159844 6736e0f8 6738bcd6 676d11e3 678dc9f4 67b3c26e 6833be77 6850a9f8 6872d11a 687997f8 688955f8 688ae8f8 68dd15ad 68dff7a9 692d721e 692dfba6 69362943 6960698b 69c6287b 6a070c50 6a20dbb1 6a588c1e 6aa1968a 6ad76a45 6b03781e 6b1f2bbf 6b6273ac 6b84a1b1 6b8634b1 6bc77a0c 6c20ded7 6c2597d7 6c28bdd7 6c2a8c23 6c9aad44 6d67abd6 6ddba36a 6deb1e41 6e0c6fc4 6e259afd 6e309ffd 6e3f4cd4 6e405dfd 6e45ae6a 6e4a676a 6e58926a 6ed58595 6f50b4fd 6f5893fd 6fec5c2c 7020e523 7036ef23 704a2342 70f57871 7109438b 714d610d 71d7c7c1 7211d131 7221747e 722e6d43 725898b6 72a6f1ea 72aa6468 73451edc 73774a87 73831b49 739ab849 743de2e7 7448302b 7452c3ff 748e21dc 75241302 7569cfd9 75e7c3aa 75fb9838 762e88f6 76589f02 76840c1c 76884816 76a29c02 7728cf28 77741601 77c94e16 78466b4e 7853e928 7896f3dd 78e9e75a 79fd97e7 7a1a5c23 7a36fee1 7a8eb542 7a9363d2 7b6f8cee 7bec49a8 7c3c2371 7c4c1074 7c736b48 7c931b44 7d1be35a 7d2d5709 7d37039a 7d58aa07 7d8ced72 7da52cf9 7e04fc63 7e7bb430 7e93f006 7eed1b50 7f432e99 7f545ffa 7f55872d 7f5a402d 80b2827a 811143f5 814b734c 815bfbef 81865753 81c2a1ee 81d3070a 81d6710d 821ab579 82260ed3 823ca991 829acfe6 82f56967 8333e70c 83378db6 833d5f8d 83406b06 83609279 84443e0c 8485de13 84e878b5 851f3783 8545d29f 859e45c4 85d83cfd 85f2e104 8651ed97 867b8fff 873c2e46 87566b64 87740831 877a66df 87ce78eb 88018ac5 880facad 88559558 88572858 88cd6848 894c24eb 8950ddeb 89609beb 89d20f3f 89fc4fa8 8a48e1f9 8ac66219 8b609f11 8b6d7c44 8b783c11 8b86a4b0 8ba6588f 8be194e7 8bf0c864 8c47c039 8c8b21a4 8d3589ca 8d3b2177 8d45df37 8d490537 8d7c4994 8d98b93d 8e2dac5d 8e60a3ca 8e740394 8e8b24ca 8f47755d 8f7e8921 8fa5e95d 8fcde8c8 9074f6bb 9098e9fc 90bd767d 90cc33ab 90fd7101 910dc246 915acc8e 9160a883 9199b066 9245e716 92477a16 927d0016 92d2a332 931f893c 9326d4c8 934d5500 9350eda9 939fa3a9 93d36498 940de4ca 943c2a68 9491a609 953e8a6d 9551bb46 955229e8 9609fad2 965ce7b4 9688dfd3 96ea21da 970c51a1 9761168b 976a6b99 977a375c 97e020da 981e7af3 984f6288 989f26db 98caf151 991358a2 991823fd 9946360a 994f641b 99fd8f51 9a7d0cae 9a8ff0ae 9a9a3a81 9aa94c43 9b5a6c41 9c1c7167 9c33d72a 9ca8abdc 9d43416d 9d62ab40 9dd22fb4 9e5a70fa 9e60bcfa 9e6a400b 9e6b2181 9fdce02e a0373ab3 a0a60420 a11fddbb a14c4ab3 a160c1b3 a1661fec a1785eb3 a1b340c5 a24d61d7 a279f346 a2a8f0d5 a2bbf322 a36fcd26 a3b1ab8f a3cf337f a3d4744b a43e5abc a45d5497 a490006c a49048a2 a491936c a5149d26 a5291792 a53fa5cf a547ac88 a55a7bff a58fda85 a5b45028 a5b82ecc a607d3c6 a62c88be a62f19cd a631554a a64c44b6 a74e5ad4 a7532704 a779fb25 a789dc23 a79b8263 a7fbbc6b a813bb1d a8333685 a846a5d1 a848765c a8afa781 a8d3dae7 a91ebb0c a934d0a8 a960ce4b a9ad7dd8 a9cbb0a8 aa9b0ede ab104c58 ab460e71 aba2ff94 ac326f44 acac5b2f acbcadc4 acfa4257 ad408cd0 ada2f297 ae60cccb af7a07bd b0110b8a b012e2d8 b0886b72 b0a2522d b1803cce b1e93849 b2461976 b255d776 b322e19c b345839c b34c6709 b4086540 b41bbbc5 b453a579 b4724e49 b47992e9 b49dd7e7 b58b622f b59b202f b6426255 b647eebc b654372d b6733df5 b6ea92a7 b6efcdeb b7450dd8 b74859b4 b75b4420 b75ffe90 b7b2da63 b80167aa b8183ca8 b865b845 b8b60087 b8dc6cb1 b8ed3c18 b994e672 b9e7b6aa ba2612a1 baeb8193 baf52f1a bb33e399 bb3fb13f bb7ffbb9 bbd58346 bbe4d984 bbe78f43 bc89da34 bc902634 bd51cf0b bd6c4a7f bddc1ff6 be59105a be6d5a83 be92363d beb86d7b beea09b7 bf477319 bf4c7099 bf60f0ed bfb0b3f8 c060f280 c08e9980 c1cb3c2e c1d97ae5 c1f0d757 c2342dc0 c275fe62 c3017bd3 c35db74f c35f6439 c3b1b134 c3cf42cf c3e65c90 c4466574 c47dd331 c50cf086 c51117ee c59d53cb c6477e1e c650a77b c655f6f2 c6591cf2 c6c421bd c7d7d1eb c835e6ab c85ab318 c889a687 c97da69e c99686ab ca5f6f3e cabcb40d caf465db cb13f18f cb323bfb cb344f48 cb45109d cbd1859a cc014000 cc8c56b2 cc903f64 cd5927f7 cd6106f7 cdc01764 cde747b5 ce0a2c02 ce61088a cea64c8a cebeddfd cec82aaa cececcf6 cee410af cf5774cd cf582e09 cf592b1d cf5b5d95 cf877f71 cfad68cc d05ea611 d06e0999 d0a11184 d0c5794e d0e1400d d11b8630 d1247a05 d15d6cbb d176d284 d20afafb d24c97d6 d252e3d6 d272f13d d278abd6 d28165d7 d2d299f0 d2dffdb4 d3593169 d3c674d4 d4407964 d446213c d457f867 d496126a d503f41a d5296322 d54c9c8f d552e88f d5551328 d561138f d627d1b5 d65f8222 d6696c2c d6a65922 d6c67e20 d6d81d17 d6e4a5f4 d724e630 d7bc7166 d82188db d84d7e4c d8611848 d86a2529 d8a78f99 d8bd6e03 d8eab682 d8f423b3 d909e94c d9205727 d9393bec d9490bbc d95f86db d9c153f5 da24b201 da572e14 da611b6e daaccf83 dbd775e0 dc73eec1 dc743862 dc9b5d94 dd50a8cb dd55c40a de09f12b de470c6e de552c95 de854a5b de8556ba de8d35ba debea259 dec8a8b9 df57b14d dfa01b4d e0561fe0 e09e89e0 e136572a e13f3e3e e15b843f e191c01d e2315699 e247ac75 e2afcd3c e34cb299 e3612999 e3c85826 e44fda2c e485602c e49e902c e4c9afef e4fb10ba e55c8529 e55f99bf e5612cbf e5a46ab0 e5b0c0d7 e5ba886e e5c9b72a e614a394 e624c4e5 e6dcacf3 e70b479d e71b5478 e739f7a9 e75171e5 e8562c78 e8678ff9 e8907093 e8c96011 e9562e0b e99ccac3 e9f06349 ea0de882 ea398bca ea9e999e eaa3529e eb0f6aef eb78c383 eb7cf74d eb98a759 eb9b0b07 ec2037bc ec2afa1f ec4c51f1 ec4cc0c4 ec97191b ecce5746 ed517b57 ed850a86 ed91503d eda03157 edb8f87b edc661a1 edd6f7f5 ee5635ea ef7c6112 ef8aaf52 f0879946 f09de75b f0bdfb1e f1079561 f12e4836 f1480fa3 f1563aa3 f19b7ea3 f2131b79 f2141f19 f23bf3e8 f27f2a36 f28ee836 f2ef2c23 f3347f8c f33771d3 f374dd1f f3d9ffdb f42e4cef f430e7bd f446815c f4563f5c f4a02f89 f4d702fa f4f36b96 f4f95826 f5169c89 f540fe7c f5442f5f f54cfc2e f56145ef f59b84ef f5a25cd6 f5d2ce94 f64324c3 f645ed15 f649aa82 f6775182 f6845f75 f7481915 f7922109 f7d945c7 f7f8611c f849ada8 f88712a8 f8ae62ed f91b70ce f921bcce f9269459 f9d40fb7 f9fdd48a fa18570c fa399fc8 fa4774f0 fa6413f7 fa9eb2ce faa9dc30 fae8f573 faffcade fb3a03f5 fb4e98fe fb871761 fbec722f fc49b3f4 fc4a7317 fc8d64f4 fcd168a9 fced4131 fd0e6de9 fdd5ea69 fe529279 fe59b066 fea97336 fedb3f2a ff1da773 ff42d540 ff96c610 ffcc4f49".split(' '));
+const fnv=s=>{let x=0x811c9dc5;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,0x01000193)>>>0}return x.toString(16).padStart(8,'0')};
+const AC={};
+function chunk(i){return AC[i]||(AC[i]=fetch('audio/a'+i+'.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(e=>{delete AC[i];throw e}))}
+const player=new Audio();player.preload='auto';
+let playTok=0;
+// one reusable audio element, unlocked on the first tap, so Safari lets it play after the clip loads
+document.addEventListener('pointerdown',()=>{try{player.src='data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//OEwAAAAAAAAAAAAEluZm8AAAAPAAAABQAAAqAAbW1tbW1tbW1tbW1tbW1tbW1tbZKSkpKSkpKSkpKSkpKSkpKSkpKStra2tra2tra2tra2tra2tra2trbb29vb29vb29vb29vb29vb29vb2///////////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQEUAAAAAAAAAKgvT9A1gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//NExAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExFMAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKYAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';const p=player.play();p&&p.catch(()=>{})}catch(e){}},{capture:true,once:true});
+function speakRaw(text,onend){
+  const k=fnv(text);
+  if(!AK.has(k)){ttsSpeak(text,onend);return}
+  const tok=++playTok;
+  try{window.speechSynthesis&&speechSynthesis.cancel()}catch(e){}
+  try{player.pause()}catch(e){}
+  chunk(k[0]).then(c=>{
+    if(tok!==playTok)return;
+    player.onended=()=>{if(tok===playTok)onend&&onend()};
+    player.src='data:audio/mpeg;base64,'+c[k];
+    const p=player.play();
+    p&&p.catch(e=>{if(tok!==playTok)return;if(e&&e.name==='NotAllowedError')toast('Нажми на значок ещё раз, чтобы включить звук.');else ttsSpeak(text,onend)});
+  }).catch(()=>{if(tok===playTok){toast('Не загрузилась запись, пробую голос компьютера.');ttsSpeak(text,onend)}});
+}
+setTimeout(()=>{let i=0;const n=()=>{if(i<16)chunk((i++).toString(16)).catch(()=>{}).finally(()=>setTimeout(n,200))};n()},2500);
 function say(t){speakRaw(clean(t))}
 
 /* ---------- spaced repetition ---------- */
@@ -560,7 +569,7 @@ function lessonView(n){
 
 /* ---------- TEXTS ---------- */
 let playing=null;
-function stopAll(){playing=null;try{if(curA){curA.onended=null;curA.pause();curA=null}}catch(e){}try{const ss=speechSynthesis;if(ss.speaking||ss.pending)ss.cancel()}catch(e){}document.querySelectorAll('.sent-row.now').forEach(e=>e.classList.remove('now'));const b=$('#playall');if(b)b.innerHTML=`${ICON} Слушать весь текст`}
+function stopAll(){playing=null;playTok++;try{player.pause()}catch(e){}try{const ss=speechSynthesis;if(ss.speaking||ss.pending)ss.cancel()}catch(e){}document.querySelectorAll('.sent-row.now').forEach(e=>e.classList.remove('now'));const b=$('#playall');if(b)b.innerHTML=`${ICON} Слушать весь текст`}
 function textsHome(){
   cur='texts';showTabs(true);
   const rows=TEXTS.map((t,k)=>`<button class="lrow" data-t="${k}"><span class="lnum">${t.lesson}</span><span class="lname"><b><span class="zhs">${esc(t.zh)}</span></b><span class="small muted">${esc(t.ru)} · урок ${t.lesson}</span></span><span class="pill ${C.read[k]?'k':'todo'}">${C.read[k]?'прочитано':t.s.length+' предл.'}</span></button>`).join('');
