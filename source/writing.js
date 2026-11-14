@@ -30,11 +30,24 @@ function writeView(word,meta,opts){ // overlay; works on top of cards, lessons, 
   const chars=[...new Set([...clean(word)].filter(hasStrokes))];
   if(!chars.length){toast('Для этого слова нет данных о чертах.');return}
   const ov=document.createElement('div');ov.className='wov';ov.id='wov';
-  document.body.appendChild(ov);document.body.classList.add('noscroll');
+  // Safari draws the 3D flip card above fixed layers, so the app underneath is taken out
+  // of the page while writing is open; it comes back exactly as it was on close
+  WV_scroll=window.scrollY;
+  document.body.appendChild(ov);document.body.classList.add('noscroll','wov-open');window.scrollTo(0,0);
+  try{if(typeof tg!=='undefined'&&tg&&tg.BackButton){tg.BackButton.onClick(closeWrite);tg.BackButton.show()}}catch(e){}
   WV={chars,k:0,writer:null,meta:meta||{},onClose:opts&&opts.onClose};
   if(opts&&opts.ladder){WV.k=Math.max(0,chars.indexOf(opts.ladder));startLadder()}else renderWrite();
 }
-function closeWrite(){const o=$('#wov');const cb=WV&&WV.onClose;if(o)o.remove();document.body.classList.remove('noscroll');WV=null;cb&&cb()}
+let WV_scroll=0;
+function closeWrite(){
+  const cb=WV&&WV.onClose;
+  try{WV&&WV.writer&&WV.writer.cancelQuiz()}catch(e){}
+  document.querySelectorAll('#wov').forEach(o=>o.remove());
+  document.body.classList.remove('noscroll','wov-open');
+  try{if(typeof tg!=='undefined'&&tg&&tg.BackButton){tg.BackButton.offClick(closeWrite);tg.BackButton.hide()}}catch(e){}
+  if(WV)window.scrollTo(0,WV_scroll);
+  WV=null;cb&&cb();
+}
 function wHead(c){
   const m=WV.meta,n=STROKES[c].strokes.length,done=(C.wr||{})[c];
   return `<div class="top"><div class="grow"><div class="eyebrow">Как писать${m.word&&m.word!==c?' · '+esc(m.word):''}</div></div><button class="btn plain" id="wx" style="width:auto;padding:8px">Закрыть</button></div>
@@ -88,7 +101,7 @@ function ladderStep(){
   </div>`;
   wBind(c);
   requestAnimationFrame(()=>{
-    const t=$('#wtarget');
+    const t=$('#wtarget');if(!t)return;t.innerHTML='';
     if(st.k==='watch'){
       WV.writer=makeWriter(t,c,{showCharacter:false});if(!WV.writer)return;
       const my=WV.writer,live=()=>WV&&WV.writer===my;   // ignore callbacks from a step already left

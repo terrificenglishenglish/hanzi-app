@@ -125,11 +125,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .face.back{transform:rotateY(180deg);gap:12px}
 .flip .back{pointer-events:none}
 .flip.on .front{transform:rotateY(-180deg);pointer-events:none}
-.flip.on .back{transform:rotateY(0) translateZ(1px);pointer-events:auto;z-index:1}
+.flip.on .back{transform:rotateY(0);pointer-events:auto;z-index:1}
 .face .speak{position:relative;z-index:2}
 .speak:active{transform:scale(.94)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));width:min(420px,calc(100% - 32px));
-  background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px;font-size:14px;z-index:20;box-shadow:0 6px 20px color-mix(in srgb,var(--ink) 25%,transparent)}
+  background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px;font-size:14px;z-index:1100;box-shadow:0 6px 20px color-mix(in srgb,var(--ink) 25%,transparent)}
 .front .hz{font-size:clamp(72px,24vw,112px)}
 .front .hz.long{font-size:clamp(48px,14vw,72px)}
 .tr.big{font-size:30px}
@@ -196,7 +196,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .cr{font-size:14px;min-width:0}
 .cm .speak.sm{padding:6px 9px}
 body.noscroll{overflow:hidden}
-.wov{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body.wov-open #app,body.wov-open .tabs,body.wov-open .sheet{display:none!important}
+.wov{position:fixed;inset:0;z-index:1000;isolation:isolate;-webkit-overflow-scrolling:touch;background:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wov-in{max-width:440px;margin:0 auto;padding-block:16px 32px;display:flex;flex-direction:column;gap:14px}
 .wchars{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .wchars button{font-family:var(--hz);font-size:26px;font-weight:700;width:52px;height:52px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface)}
@@ -889,11 +890,24 @@ function writeView(word,meta,opts){ // overlay; works on top of cards, lessons, 
   const chars=[...new Set([...clean(word)].filter(hasStrokes))];
   if(!chars.length){toast('Для этого слова нет данных о чертах.');return}
   const ov=document.createElement('div');ov.className='wov';ov.id='wov';
-  document.body.appendChild(ov);document.body.classList.add('noscroll');
+  // Safari draws the 3D flip card above fixed layers, so the app underneath is taken out
+  // of the page while writing is open; it comes back exactly as it was on close
+  WV_scroll=window.scrollY;
+  document.body.appendChild(ov);document.body.classList.add('noscroll','wov-open');window.scrollTo(0,0);
+  try{if(typeof tg!=='undefined'&&tg&&tg.BackButton){tg.BackButton.onClick(closeWrite);tg.BackButton.show()}}catch(e){}
   WV={chars,k:0,writer:null,meta:meta||{},onClose:opts&&opts.onClose};
   if(opts&&opts.ladder){WV.k=Math.max(0,chars.indexOf(opts.ladder));startLadder()}else renderWrite();
 }
-function closeWrite(){const o=$('#wov');const cb=WV&&WV.onClose;if(o)o.remove();document.body.classList.remove('noscroll');WV=null;cb&&cb()}
+let WV_scroll=0;
+function closeWrite(){
+  const cb=WV&&WV.onClose;
+  try{WV&&WV.writer&&WV.writer.cancelQuiz()}catch(e){}
+  document.querySelectorAll('#wov').forEach(o=>o.remove());
+  document.body.classList.remove('noscroll','wov-open');
+  try{if(typeof tg!=='undefined'&&tg&&tg.BackButton){tg.BackButton.offClick(closeWrite);tg.BackButton.hide()}}catch(e){}
+  if(WV)window.scrollTo(0,WV_scroll);
+  WV=null;cb&&cb();
+}
 function wHead(c){
   const m=WV.meta,n=STROKES[c].strokes.length,done=(C.wr||{})[c];
   return `<div class="top"><div class="grow"><div class="eyebrow">Как писать${m.word&&m.word!==c?' · '+esc(m.word):''}</div></div><button class="btn plain" id="wx" style="width:auto;padding:8px">Закрыть</button></div>
@@ -947,7 +961,7 @@ function ladderStep(){
   </div>`;
   wBind(c);
   requestAnimationFrame(()=>{
-    const t=$('#wtarget');
+    const t=$('#wtarget');if(!t)return;t.innerHTML='';
     if(st.k==='watch'){
       WV.writer=makeWriter(t,c,{showCharacter:false});if(!WV.writer)return;
       const my=WV.writer,live=()=>WV&&WV.writer===my;   // ignore callbacks from a step already left

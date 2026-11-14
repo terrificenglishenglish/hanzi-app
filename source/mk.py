@@ -36,7 +36,9 @@ def py(s):
             out.append(PROPER.get(tok) or ''.join(pp))
         else: out.append(tok)
         idx+=len(tok)
-    r=' '.join(out); return r[:1].upper()+r[1:]
+    r=' '.join(out)
+    r=re.sub(r'([.!?] )([a-zāáǎàēéěèīíǐìōóǒòūúǔù])',lambda m:m.group(1)+m.group(2).upper(),r)
+    return r[:1].upper()+r[1:]
 def blank(s,h):
     parts=[p for p in h.split('…') if p]; pos=0; res=s
     for p in parts:
@@ -48,7 +50,7 @@ for w in d['words']:
     h=w['hanzi']
     if len(h)>1 and '…' not in h and '/' not in h and re.fullmatch('[\u4e00-\u9fff]+',h):
         jieba.add_word(h,freq=200000); PROPER.setdefault(h,w['pinyin'].replace('…',''))
-for k,v in {'朋友':'péngyou','多少':'duōshao','衣服':'yīfu','名字':'míngzi','奶奶':'nǎinai','时候':'shíhou','意思':'yìsi','娜斯佳':'Nàsījiā'}.items(): PROPER[k]=v; jieba.add_word(k,freq=200000)
+for k,v in {'朋友':'péngyou','多少':'duōshao','衣服':'yīfu','名字':'míngzi','奶奶':'nǎinai','十个':'shí ge','一个':'yí ge','两个':'liǎng ge','时候':'shíhou','意思':'yìsi','娜斯佳':'Nàsījiā'}.items(): PROPER[k]=v; jieba.add_word(k,freq=200000)
 L=[[l['n'],l['title'].split(' · ',1)[1]] for l in d['lessons']]
 W=[];bad=[]
 for i,w in enumerate(d['words']):
@@ -57,6 +59,9 @@ for i,w in enumerate(d['words']):
     W.append([w['hanzi'],w['pinyin'],w['ru'],w['lesson'],zh,b or zh,py(zh),ru])
 print('bad',bad,len(ex))
 # lessons added later (from lesson photos): append-only, so card indices never shift
+for line in open('lessons_extra.tsv'):   # register all new words first, so every sentence sees them
+    f=line.rstrip('\n').split('\t')
+    if len(f)==6 and not line.startswith('#'): jieba.add_word(f[1],freq=200000); PROPER.setdefault(f[1],f[2])
 for line in open('lessons_extra.tsv'):
     line=line.rstrip('\n')
     if not line.strip(): continue
