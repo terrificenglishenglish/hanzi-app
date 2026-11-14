@@ -202,6 +202,7 @@ body.wov-open #app,body.wov-open .tabs,body.wov-open .sheet{display:none!importa
 .ld{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:15px;background:var(--surface);border:1.5px solid var(--line);opacity:.55}
 .ld.now{border-color:var(--accent);background:var(--accent-soft);opacity:1}
 .ld.ok{border-color:var(--known);background:color-mix(in srgb,var(--known) 14%,var(--surface));opacity:1}
+.lcards{display:flex;flex-direction:column;gap:8px}
 .ltitle{display:flex;flex-direction:column;gap:2px;text-align:center}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -420,7 +421,7 @@ function card(){
       </div>
     </div>
     <div id="act"><button class="btn" id="turn">Перевернуть</button></div>`;
-  $('#quit').onclick=()=>setTab('learn');
+  $('#quit').onclick=()=>{if(Q.lesson){showTabs(true);lessonView(Q.lesson)}else setTab('learn')};
   const box=$('#flip');
   const stop=f=>e=>{e.stopPropagation();f()};
   $('#sayw').onclick=stop(()=>say(w[0]));
@@ -440,11 +441,32 @@ function card(){
   $('#turn').onclick=turn;
 }
 function grade(i,g){
-  rate(i,g);Q.stats[g]++;
+  rate(i,g);Q.stats[g]++;Q.last=Q.last||{};Q.last[i]=g;
   if(g===0){ Q.q.splice(Math.min(Q.pos+4,Q.q.length),0,i); }   // "Не знал": comes back in a few cards
   Q.pos++;card();
 }
+// cards for one lesson, opened from the lesson page; answers count in spaced repetition as usual
+function startLessonCards(n,ids){
+  Q={q:ids.slice(),pos:0,seen:{},stats:{0:0,1:0,2:0},total:ids.length,lesson:n,last:{}};
+  showTabs(false);window.scrollTo(0,0);card();
+}
+function lessonCardsDone(){
+  cur='done';showTabs(true);
+  const n=Q.lesson,hard=Object.entries(Q.last).filter(([,g])=>g<2).map(([i])=>+i);
+  app.innerHTML=`
+    <div><div class="eyebrow">Урок ${n} · карточки</div><h1 style="margin-top:6px">${esc(LESSONS[n-1][1])}</h1></div>
+    <div class="stats"><div class="stat k"><b>${Q.stats[2]}</b><span>знал</span></div><div class="stat u"><b>${Q.stats[1]}</b><span>сомневался</span></div><div class="stat n"><b>${Q.stats[0]}</b><span>не знал</span></div></div>
+    ${hard.length?`<div class="panel"><h2 style="margin-bottom:10px">Ещё не уверенно</h2><div class="chips">${hard.map(i=>`<button class="chip u" data-i="${i}">${esc(WORDS[i][0])}</button>`).join('')}</div></div>
+      <button class="btn" id="again">Повторить ${hard.length} ${plural(hard.length,'трудное слово','трудных слова','трудных слов')}</button>`:`<p class="note">Все слова урока ты знаешь! Они вернутся на повторение позже сами.</p>`}
+    <button class="btn ghost" id="all">Пройти весь урок ещё раз</button>
+    <button class="btn plain" id="toL">← К уроку</button>`;
+  app.querySelectorAll('.chip').forEach(b=>b.onclick=()=>say(WORDS[+b.dataset.i][0]));
+  $('#again')?.addEventListener('click',()=>startLessonCards(n,shuffle(hard)));
+  $('#all').onclick=()=>startLessonCards(n,lessonWords(n));
+  $('#toL').onclick=()=>lessonView(n);
+}
 function sessionDone(){
+  if(Q.lesson)return lessonCardsDone();
   cur='done';showTabs(true);
   const tm=Object.values(C.cards).filter(c=>{const t=new Date();t.setHours(24,0,0,0);return c.due>=t.getTime()&&c.due<t.getTime()+DAY}).length;
   app.innerHTML=`
@@ -468,17 +490,25 @@ function wordsHome(){
   app.querySelectorAll('.lrow').forEach(b=>b.onclick=()=>lessonView(+b.dataset.l));
 }
 function lessonView(n){
-  cur='lesson';
+  cur='lesson';window.scrollTo(0,0);
   const ws=lessonWords(n);
   app.innerHTML=`
     <div class="top"><button class="btn plain" id="back" style="width:auto;padding:8px 8px 8px 0">← Уроки</button></div>
-    <div><div class="eyebrow">Урок ${n}</div><h1 style="margin-top:6px">${esc(LESSONS[n-1][1])}</h1></div>
+    <div><div class="eyebrow">Урок ${n} · ${ws.length} ${plural(ws.length,'слово','слова','слов')}</div><h1 style="margin-top:6px">${esc(LESSONS[n-1][1])}</h1></div>
+    <div class="lcards">
+      <button class="btn" id="lc-all">🃏 Учить урок карточками</button>
+      ${(()=>{const k=ws.filter(i=>status(i)[0]!=='k').length;return k&&k<ws.length?`<button class="btn ghost" id="lc-weak">Только незнакомые и трудные · ${k}</button>`:''})()}
+      <button class="btn plain" id="lc-mix">Перемешать и пройти все</button>
+    </div>
     ${TEXTS.some(t=>t.lesson===n)?`<div class="panel"><h2 style="margin-bottom:4px">Тексты урока</h2><div class="lessons">${TEXTS.map((t,k)=>[t,k]).filter(([t])=>t.lesson===n).map(([t,k])=>`<button class="lrow" data-t="${k}"><span class="lnum">读</span><span class="lname"><b><span class="zhs">${esc(t.zh)}</span> ${esc(t.ru)}</b></span><span class="pill ${C.read[k]?'k':'todo'}">${C.read[k]?'прочитано':t.s.length+' предл.'}</span></button>`).join('')}</div></div>`:''}
     <div class="panel"><div class="wlist">${ws.map(i=>{const w=WORDS[i],[s,l]=status(i),c=C.cards[i];
       const nxt=c?(c.due<=Date.now()?'сегодня':'через '+fmtIv(Math.max(1,Math.round((c.due-Date.now())/DAY)))):'';
       return `<button class="wrow" data-i="${i}"><span class="h">${esc(w[0])}</span><span class="m">${esc(w[2])}<span>${esc(w[1])}</span></span><span class="r"><span class="pill ${s}">${l}</span>${nxt?`<small>${nxt}</small>`:''}</span></button>`}).join('')}</div></div>
     <p class="small muted">Нажми на слово, чтобы послушать его и посмотреть, как пишется каждый иероглиф.</p>`;
   $('#back').onclick=wordsHome;
+  $('#lc-all').onclick=()=>startLessonCards(n,ws);
+  $('#lc-weak')?.addEventListener('click',()=>startLessonCards(n,ws.filter(i=>status(i)[0]!=='k')));
+  $('#lc-mix').onclick=()=>startLessonCards(n,shuffle(ws));
   app.querySelectorAll('.lrow[data-t]').forEach(b=>b.onclick=()=>reader(+b.dataset.t,()=>lessonView(n)));
   app.querySelectorAll('.wrow').forEach(b=>b.onclick=()=>{const w=WORDS[+b.dataset.i];writeView(w[0],{word:w[0],py:w[1],ru:w[2]})});
 }
