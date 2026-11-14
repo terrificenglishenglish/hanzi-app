@@ -45,6 +45,17 @@ html = ('<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">\n'
         '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n'
         + head.replace('<style>', '<style>\n' + RESET, 1) + '</style>\n</head>\n<body>\n' + body.strip() + '\n</body>\n</html>\n')
+import time
+V = time.strftime('%Y%m%d%H%M')
+for f in ['vendor/hanzi-writer.min.js','data/words.js','data/texts.js','data/chars.js','data/strokes.js']:
+    html = html.replace('src="'+f+'"', 'src="'+f+'?v='+V+'"')
+html = html.replace("fetch('audio/a'+i+'.json')", "fetch('audio/a'+i+'.json?v='+APP_V)")
+# self-update: if the server has a newer build than this cached page, reload onto it
+html = html.replace('<script src="https://telegram.org/js/telegram-web-app.js"></script>',
+  '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n<script>const APP_V="'+V+'";'
+  'fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j.v&&j.v!==APP_V&&!sessionStorage.getItem("upd"+j.v)){'
+  'sessionStorage.setItem("upd"+j.v,"1");const u=new URL(location.href);u.searchParams.set("v",j.v);location.replace(u.toString())}}).catch(()=>{});</script>', 1)
+open(OUT + '/version.json', 'w').write('{"v":"'+V+'"}\n')
 open(OUT + '/index.html', 'w').write(html)
 
 shutil.copy('data.js', OUT + '/data/words.js')
